@@ -1,2 +1,1 @@
-rm test
-gcc -o test test.c cJSON.c -lcurl -lm
+gcc -std=gnu99 -Wall -Werror -pedantic -o client client.c cJSON.c -lcurl -lm
