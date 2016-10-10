@@ -29,6 +29,9 @@ void parse_object(cJSON *root) {
   cJSON* title = NULL;
   cJSON* genre = NULL;
   cJSON* artist = NULL;
+  cJSON* version = NULL;
+  version = cJSON_GetObjectItem(root, "version");
+  printf("cur version is %s\n", version->valuestring);
   cJSON* items = cJSON_GetObjectItem(root, "files");
   int sz = (int)cJSON_GetArraySize(items);
   printf("sz:%d", sz);
@@ -55,7 +58,8 @@ int main(int argc, char *argv[]) {
   //curl set up
   curl_global_init(CURL_GLOBAL_ALL);
   hnd = curl_easy_init();
-  curl_easy_setopt(hnd, CURLOPT_URL, "https://x24cx5vto4.execute-api.us-east-1.amazonaws.com/prod");
+  //curl_easy_setopt(hnd, CURLOPT_URL, "https://x24cx5vto4.execute-api.us-east-1.amazonaws.com/prod");
+  curl_easy_setopt(hnd, CURLOPT_URL, "https://x24cx5vto4.execute-api.us-east-1.amazonaws.com/prod?version=2fd708a9df3486a5c55a52f817e13246");
   curl_easy_setopt(hnd, CURLOPT_NOPROGRESS, 1L);
   curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.35.0");
   curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, slist1);
@@ -66,12 +70,19 @@ int main(int argc, char *argv[]) {
   ret = curl_easy_perform(hnd);
   curl_easy_cleanup(hnd);
   
-  cJSON* request_json = NULL;
-  request_json = cJSON_Parse(json.memory);
-  parse_object(request_json);
+
+  //cJSON* request_json = NULL;
+  //printf("%s\n", json.memory);
+  char * temp = "\"not modified\"";
+  //printf("%s\n", temp);
+  if (strcmp(json.memory, temp) == 0) {
+    printf("not modified music system\n");
+  }
+  //request_json = cJSON_Parse(json.memory);
+  //parse_object(request_json);
   
   //clean up
-  cJSON_Delete(request_json);
+  //cJSON_Delete(request_json);
   free(json.memory);
   hnd = NULL;
   curl_slist_free_all(slist1);
