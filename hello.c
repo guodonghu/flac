@@ -1,13 +1,3 @@
-/*
-  FUSE: Filesystem in Userspace
-  Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
-
-  This program can be distributed under the terms of the GNU GPL.
-  See the file COPYING.
-
-  gcc -Wall hello.c `pkg-config fuse --cflags --libs` -o hello
-*/
-
 #define FUSE_USE_VERSION 26
 #include <curl/curl.h>
 #include <stdlib.h>
@@ -21,14 +11,17 @@
 cJSON* musics = NULL;
 char* version = NULL;
 
-struct MemoryStruct {
+struct _MemoryStruct {
   char *memory;
   size_t size;
 };
 
+typedef struct _MemoryStruct MemoryStruct;
+
+
 static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
   size_t realsize = size * nmemb;
-  struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+  MemoryStruct *mem = (MemoryStruct *)userp;
   mem->memory = realloc(mem->memory, mem->size + realsize + 1);
   if(mem->memory == NULL) {
     /* out of memory! */ 
@@ -41,13 +34,34 @@ static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, voi
   return realsize;
 }
 
-
-//void parse_object(cJSON *root) {
-  
-//}
-
-
-
+MemoryStruct getMetadata(MemoryStruct data) {
+  CURLcode ret;
+  CURL *hnd;
+  struct curl_slist *slist1;
+  slist1 = NULL;
+  slist1 = curl_slist_append(slist1, "x-api-key:UJWr37dxHD4VTmEVZYPpa9U3hNJTr7wgas1Uhvsf");
+  //curl set up
+  curl_global_init(CURL_GLOBAL_ALL);
+  hnd = curl_easy_init();
+  curl_easy_setopt(hnd, CURLOPT_URL, "https://x24cx5vto4.execute-api.us-east-1.amazonaws.com/prod");
+  curl_easy_setopt(hnd, CURLOPT_NOPROGRESS, 1L);
+  curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.35.0");
+  curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, slist1);
+  curl_easy_setopt(hnd, CURLOPT_MAXREDIRS, 50L);
+  curl_easy_setopt(hnd, CURLOPT_TCP_KEEPALIVE, 1L);
+  curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+  curl_easy_setopt(hnd, CURLOPT_WRITEDATA,(void*)&data);
+  ret = curl_easy_perform(hnd);
+  curl_easy_cleanup(hnd);
+  if ((int)ret != 0) {
+    fprintf(stderr, "Failed to get metadata\n");
+  }
+  hnd = NULL;
+  curl_slist_free_all(slist1);
+  slist1 = NULL;
+  curl_global_cleanup();
+  return data;
+}
 
 static const char *hello_str = "Hello World!\n";
 static const char *hello_path = "/hello";
@@ -93,28 +107,10 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 {
   (void) offset;
   (void) fi;
-  CURLcode ret;
-  CURL *hnd;
-  struct curl_slist *slist1;
-  struct MemoryStruct json;
+  MemoryStruct json;
   json.memory = malloc(1);  /* will be grown as needed by the realloc above */ 
   json.size = 0;    /* no data at this point */ 
-  
-  slist1 = NULL;
-  slist1 = curl_slist_append(slist1, "x-api-key:UJWr37dxHD4VTmEVZYPpa9U3hNJTr7wgas1Uhvsf");
-  //curl set up
-  curl_global_init(CURL_GLOBAL_ALL);
-  hnd = curl_easy_init();
-  curl_easy_setopt(hnd, CURLOPT_URL, "https://x24cx5vto4.execute-api.us-east-1.amazonaws.com/prod");
-  curl_easy_setopt(hnd, CURLOPT_NOPROGRESS, 1L);
-  curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.35.0");
-  curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, slist1);
-  curl_easy_setopt(hnd, CURLOPT_MAXREDIRS, 50L);
-  curl_easy_setopt(hnd, CURLOPT_TCP_KEEPALIVE, 1L);
-  curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-  curl_easy_setopt(hnd, CURLOPT_WRITEDATA, (void *)&json);
-  ret = curl_easy_perform(hnd);
-  curl_easy_cleanup(hnd);
+  json = getMetadata(json);
   
   cJSON* request_json = NULL;
   request_json = cJSON_Parse(json.memory);
@@ -145,11 +141,9 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   //clean up
   cJSON_Delete(request_json);
   free(json.memory);
-  hnd = NULL;
-  curl_slist_free_all(slist1);
-  slist1 = NULL;
-  curl_global_cleanup();
-  return (int)ret;
+  
+  
+  return 0;
 }
 
 static int hello_open(const char *path, struct fuse_file_info *fi)
