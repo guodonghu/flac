@@ -7,18 +7,25 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+//#include <unordered_map>
+//#include <string>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
 static const char *flacjacket_str = "Flacjacket World!\n";
 static const char *flacjacket_path = "/flacjacket";
-static const char *rock_str = "rock!\n";
-static const char *rock_path = "/rock";
+//static const char *rock_str = "rock!\n";
+//static const char *rock_path = "/rock";
 static const char *music_str = "music\n";
 static const char *music_path = "/music";
+
 //static const char *beat_str = "beat it!";
 static const char *beat_path = "beat it";
 
 cJSON* request_json = NULL;
-
+//std::unordered_map<std::string, vector<string> > genreMap;
+//std::unordered_map<std::string, vector<string> > artistMap;
 
 struct _MemoryStruct {
   char *memory;
@@ -71,7 +78,7 @@ MemoryStruct getMetadata(MemoryStruct data) {
   curl_easy_cleanup(hnd);
   
   if ((int)ret != 0) {
-    fprintf(stderr, "Failed to get metadata\n");
+    printf("Failed to get metadata\n");
   }
   
   hnd = NULL;
@@ -83,32 +90,24 @@ MemoryStruct getMetadata(MemoryStruct data) {
 
 
 static int flacjacket_getattr(const char *path, struct stat *stbuf) {
-	int res = 0;
-
-  printf( "[getattr] Called\n" );
-  printf( "\tAttributes of %s requested\n", path );
-	memset(stbuf, 0, sizeof(struct stat));
+  //printf( "[getattr] Called\n" );
+  //printf( "\tAttributes of %s requested\n", path );
+	stbuf->st_uid = getuid(); 
+  stbuf->st_gid = getgid();
+  stbuf->st_atime = time(NULL);
+  stbuf->st_mtime = time(NULL);
+  
 	if (strcmp(path, "/") == 0) {
-		stbuf->st_mode = S_IFDIR | 0755;
+		stbuf->st_mode = S_IFDIR | S_IRWXU;
 		stbuf->st_nlink = 2;
-	} else if (strcmp(path, flacjacket_path) == 0) {
-		stbuf->st_mode = S_IFREG | 0444;
+	} 
+  else {
+    stbuf->st_mode = S_IFREG | S_IRWXU;
 		stbuf->st_nlink = 1;
-		stbuf->st_size = strlen(flacjacket_str);
-	} else if (strcmp(path, music_path) == 0) {
-		stbuf->st_mode = S_IFREG | 0444;
-		stbuf->st_nlink = 1;
-		stbuf->st_size = strlen(music_str);
-	} else if (strcmp(path, rock_path) == 0) {
-		stbuf->st_mode = S_IFDIR | 0444;
-		stbuf->st_nlink = 1;
-		stbuf->st_size = strlen(rock_str);
-	}  
- 
-  else
-		res = -ENOENT;
+		stbuf->st_size = 1024;
+	} 
 
-	return res;
+	return 0;
 }
 
 static int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
@@ -137,6 +136,9 @@ static int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t fille
     for (int i = 0 ; i < sz; i++) {
       cJSON * music = cJSON_GetArrayItem(musics, i);
       title = cJSON_GetObjectItem(music, "title");
+      //char name[100];
+      //name = strcat(name, title->valuestring);
+      //strcat(name, ".mp3");
       filler(buf, title->valuestring, NULL, 0);
       //genre = cJSON_GetObjectItem(music, "genre");
       //artist = cJSON_GetObjectItem(music, "artist");
