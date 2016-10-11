@@ -8,8 +8,17 @@
 #include <errno.h>
 #include <fcntl.h>
 
-cJSON* musics = NULL;
-char* version = NULL;
+static const char *hello_str = "Hello World!\n";
+static const char *hello_path = "/hello";
+static const char *rock_str = "rock!\n";
+static const char *rock_path = "/rock";
+static const char *music_str = "music\n";
+static const char *music_path = "/music";
+//static const char *beat_str = "beat it!";
+static const char *beat_path = "beat it";
+
+cJSON* request_json = NULL;
+
 
 struct _MemoryStruct {
   char *memory;
@@ -17,7 +26,6 @@ struct _MemoryStruct {
 };
 
 typedef struct _MemoryStruct MemoryStruct;
-
 
 static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
   size_t realsize = size * nmemb;
@@ -43,7 +51,15 @@ MemoryStruct getMetadata(MemoryStruct data) {
   //curl set up
   curl_global_init(CURL_GLOBAL_ALL);
   hnd = curl_easy_init();
-  curl_easy_setopt(hnd, CURLOPT_URL, "https://x24cx5vto4.execute-api.us-east-1.amazonaws.com/prod");
+  if (request_json == NULL) {
+    curl_easy_setopt(hnd, CURLOPT_URL, "https://x24cx5vto4.execute-api.us-east-1.amazonaws.com/prod");
+  }
+  else {
+    char temp[256] = "https://x24cx5vto4.execute-api.us-east-1.amazonaws.com/prod?version=";
+    char *version = cJSON_GetObjectItem(request_json, "version")->valuestring; 
+    strcat(temp, version);
+    curl_easy_setopt(hnd, CURLOPT_URL, temp);
+  }
   curl_easy_setopt(hnd, CURLOPT_NOPROGRESS, 1L);
   curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.35.0");
   curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, slist1);
@@ -53,9 +69,11 @@ MemoryStruct getMetadata(MemoryStruct data) {
   curl_easy_setopt(hnd, CURLOPT_WRITEDATA,(void*)&data);
   ret = curl_easy_perform(hnd);
   curl_easy_cleanup(hnd);
+  
   if ((int)ret != 0) {
     fprintf(stderr, "Failed to get metadata\n");
   }
+  
   hnd = NULL;
   curl_slist_free_all(slist1);
   slist1 = NULL;
@@ -63,14 +81,6 @@ MemoryStruct getMetadata(MemoryStruct data) {
   return data;
 }
 
-static const char *hello_str = "Hello World!\n";
-static const char *hello_path = "/hello";
-static const char *rock_str = "rock!\n";
-static const char *rock_path = "/rock";
-static const char *music_str = "music\n";
-static const char *music_path = "/music";
-//static const char *beat_str = "beat it!";
-static const char *beat_path = "beat it";
 
 static int hello_getattr(const char *path, struct stat *stbuf)
 {
@@ -103,8 +113,7 @@ static int hello_getattr(const char *path, struct stat *stbuf)
 }
 
 static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t offset, struct fuse_file_info *fi)
-{
+			 off_t offset, struct fuse_file_info *fi) {
   (void) offset;
   (void) fi;
   MemoryStruct json;
@@ -112,16 +121,17 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   json.size = 0;    /* no data at this point */ 
   json = getMetadata(json);
   
-  cJSON* request_json = NULL;
-  request_json = cJSON_Parse(json.memory);
-    //parse_object(request_json); 
+  if (strcmp(json.memory, "\"not modified\"") != 0) {
+    cJSON_Delete(request_json);
+    request_json = cJSON_Parse(json.memory);
+  } 
+  
+  cJSON* musics = cJSON_GetObjectItem(request_json, "files");
   
   if (strcmp(path, "/") == 0) {
     cJSON* title = NULL;
     //cJSON* genre = NULL;
     //cJSON* artist = NULL;
-    //version = cJSON_GetObjectItem(request_json, "version");
-    musics = cJSON_GetObjectItem(request_json, "files");
     int sz = (int)cJSON_GetArraySize(musics);
     filler(buf, ".", NULL, 0);
     filler(buf, "..", NULL, 0);
@@ -139,10 +149,7 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   }
   
   //clean up
-  cJSON_Delete(request_json);
   free(json.memory);
-  
-  
   return 0;
 }
 
@@ -192,7 +199,10 @@ static struct fuse_operations hello_oper = {
 	.read		= hello_read,
 };
 
-int main(int argc, char *argv[])
-{
-	return fuse_main(argc, argv, &hello_oper, NULL);
+int main(int argc, char *argv[]) {
+	int exit_status = fuse_main(argc, argv, &hello_oper, NULL);
+  if (request_json != NULL) {
+    cJSON_Delete(request_json);
+  }
+  return exit_status;
 }
