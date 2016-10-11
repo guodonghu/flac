@@ -8,8 +8,8 @@
 #include <errno.h>
 #include <fcntl.h>
 
-static const char *hello_str = "Hello World!\n";
-static const char *hello_path = "/hello";
+static const char *flacjacket_str = "Flacjacket World!\n";
+static const char *flacjacket_path = "/flacjacket";
 static const char *rock_str = "rock!\n";
 static const char *rock_path = "/rock";
 static const char *music_str = "music\n";
@@ -82,8 +82,7 @@ MemoryStruct getMetadata(MemoryStruct data) {
 }
 
 
-static int hello_getattr(const char *path, struct stat *stbuf)
-{
+static int flacjacket_getattr(const char *path, struct stat *stbuf) {
 	int res = 0;
 
   printf( "[getattr] Called\n" );
@@ -92,10 +91,10 @@ static int hello_getattr(const char *path, struct stat *stbuf)
 	if (strcmp(path, "/") == 0) {
 		stbuf->st_mode = S_IFDIR | 0755;
 		stbuf->st_nlink = 2;
-	} else if (strcmp(path, hello_path) == 0) {
+	} else if (strcmp(path, flacjacket_path) == 0) {
 		stbuf->st_mode = S_IFREG | 0444;
 		stbuf->st_nlink = 1;
-		stbuf->st_size = strlen(hello_str);
+		stbuf->st_size = strlen(flacjacket_str);
 	} else if (strcmp(path, music_path) == 0) {
 		stbuf->st_mode = S_IFREG | 0444;
 		stbuf->st_nlink = 1;
@@ -112,7 +111,7 @@ static int hello_getattr(const char *path, struct stat *stbuf)
 	return res;
 }
 
-static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+static int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			 off_t offset, struct fuse_file_info *fi) {
   (void) offset;
   (void) fi;
@@ -153,9 +152,8 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   return 0;
 }
 
-static int hello_open(const char *path, struct fuse_file_info *fi)
-{
-	if (strcmp(path, hello_path) == 0)
+static int flacjacket_open(const char *path, struct fuse_file_info *fi) {
+	if (strcmp(path, flacjacket_path) == 0)
 		return 0;
   
   if (strcmp(path, music_path) == 0)
@@ -166,17 +164,15 @@ static int hello_open(const char *path, struct fuse_file_info *fi)
 	return 0;
 }
 
-static int hello_read(const char *path, char *buf, size_t size, off_t offset,
-		      struct fuse_file_info *fi)
-{
+static int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,
+                           struct fuse_file_info *fi) {
 	size_t len;
-	(void) fi;
-	if(strcmp(path, hello_path) == 0) {
-		len = strlen(hello_str);
+	if(strcmp(path, flacjacket_path) == 0) {
+		len = strlen(flacjacket_str);
     if (offset < len) {
       if (offset + size > len)
         size = len - offset;
-      memcpy(buf, hello_str + offset, size);
+      memcpy(buf, flacjacket_str + offset, size);
     } 
   } else if (strcmp(path, music_path) == 0) {
     len = strlen(music_str);
@@ -192,15 +188,15 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 	return size;
 }
 
-static struct fuse_operations hello_oper = {
-	.getattr	= hello_getattr,
-	.readdir	= hello_readdir,
-	.open		= hello_open,
-	.read		= hello_read,
+static struct fuse_operations flacjacket_oper = {
+	.getattr	= flacjacket_getattr,
+	.readdir	= flacjacket_readdir,
+	.open		= flacjacket_open,
+	.read		= flacjacket_read,
 };
 
 int main(int argc, char *argv[]) {
-	int exit_status = fuse_main(argc, argv, &hello_oper, NULL);
+	int exit_status = fuse_main(argc, argv, &flacjacket_oper, NULL);
   if (request_json != NULL) {
     cJSON_Delete(request_json);
   }
