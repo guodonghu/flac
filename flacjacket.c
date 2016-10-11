@@ -18,8 +18,8 @@ static struct flacjacket_oper flacjacket_oper;
 
 int main(int argc, char *argv[]) {
 	int exit_status = fuse_main(argc, argv, &flacjacket_oper, NULL);
-  //if (request_json != NULL) {
-  //  cJSON_Delete(request_json);
-  //}
+  if (request_json != NULL) {
+    cJSON_Delete(request_json);
+  }
   return exit_status;
 }
