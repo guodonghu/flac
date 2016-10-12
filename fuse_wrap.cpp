@@ -29,13 +29,13 @@ void buildMap(std::unordered_map<std::string, std::unordered_set<std::string> > 
   std::string mp3(title->valuestring);
   mp3 += ".mp3";
   map[category_str].insert(mp3); 
-  /*if (!map[category_str].empty()) {
+  
+  if (!map[category_str].empty()) {
     printf("buildMap!!!!!!!\n");
-    for(auto i : genreMap) {
+    for(auto i : artistMap) {
       printf("%s\n", i.first.c_str());
     }
-    printf("%s\n", category_str.c_str());
-    }*/
+  }
 }
 
 size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
@@ -115,7 +115,6 @@ int flacjacket_getattr(const char *path, struct stat *stbuf) {
     //printf("path is : %s\n", path);
     stbuf->st_mode = S_IFDIR | S_IRWXU;
     stbuf->st_nlink = 2;
-    stbuf->st_size = 1024;
   }  
   else {
     stbuf->st_mode = S_IFREG | S_IRWXU;
@@ -166,13 +165,14 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     }
   }
   else if (genreMap.find(path_str) != genreMap.end()) {
-    printf("ls genre!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     for (auto i : genreMap[path_str]) {
       filler(buf, i.c_str(), NULL, 0);
     }
   }
   else if (artistMap.find(path_str) != artistMap.end()) {
+    printf("ls artist!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     for (auto i : artistMap[path_str]) {
+      printf("%s\n", i.c_str());
       filler(buf, i.c_str(), NULL, 0);
     }
   }
