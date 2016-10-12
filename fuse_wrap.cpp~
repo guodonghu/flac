@@ -13,29 +13,24 @@
 #include <unistd.h>
 #include <unordered_map>
 #include <unordered_set>
-#include <vector>
 #include <string>
+
 
 
 cJSON* request_json = NULL;
 std::unordered_map<std::string, std::unordered_set<std::string> > genreMap;
 std::unordered_map<std::string, std::unordered_set<std::string> > artistMap;
 
-void buildMap(std::unordered_map<std::string, std::unordered_set<std::string> > &map, cJSON *music, std::string type) {
+void buildMap(std::unordered_map<std::string, std::unordered_set<std::string> > map, cJSON *music, std::string type) {
   cJSON *title = cJSON_GetObjectItem(music, "title");
   cJSON *category = cJSON_GetObjectItem(music, type.c_str());
   std::string category_str(category->valuestring);
   category_str = "/" + category_str;
-  std::string mp3(title->valuestring);
-  mp3 += ".mp3";
-  map[category_str].insert(mp3); 
-  /*if (!map[category_str].empty()) {
+  map[category_str].insert(title->valuestring);
+  if (!map[category_str].empty()) {
     printf("buildMap!!!!!!!\n");
-    for(auto i : genreMap) {
-      printf("%s\n", i.first.c_str());
-    }
     printf("%s\n", category_str.c_str());
-    }*/
+  }
 }
 
 size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
@@ -102,10 +97,10 @@ int flacjacket_getattr(const char *path, struct stat *stbuf) {
   stbuf->st_mtime = time(NULL);
   std::string path_str(path);
   
-  //printf("path is %s !!!!!!!!!!!!!!!!!\n", path);
-  //for (auto i : genreMap) {
-  //  printf("%s\n", i.first.c_str());
-  //}
+  printf("path is %s !!!!!!!!!!!!!!!!!\n", path);
+  for (auto i : genreMap) {
+    printf("%s\n", i.first.c_str());
+  }
 
 	if (strcmp(path, "/") == 0) {
 		stbuf->st_mode = S_IFDIR | S_IRWXU;
@@ -130,16 +125,15 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			 off_t offset, struct fuse_file_info *fi) {
   (void) offset;
   (void) fi;
-  
   std::string path_str(path);
   MemoryStruct json;
   json.memory = (char*)malloc(1);  /* will be grown as needed by the realloc above */ 
   json.size = 0;    /* no data at this point */ 
   json = getMetadata(json);
-  /*printf("path is %s !!!!!!!!!!!!!!!!!\n", path);
+  printf("path is %s !!!!!!!!!!!!!!!!!\n", path);
   for (auto i : genreMap) {
     printf("%s\n", i.first.c_str());
-    }*/
+  }
 
   if (strcmp(json.memory, "\"not modified\"") != 0) {
     cJSON_Delete(request_json);
