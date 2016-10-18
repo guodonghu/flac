@@ -1,5 +1,5 @@
-#ifndef FUSE_WRAP_HPP
-#define FUSE_WRAP_HPP
+#ifndef FUSE_WRAPPER_HPP
+#define FUSE_WRAPPER_HPP
 #define FUSE_USE_VERSION 26
 #include <stdlib.h>
 #include <fuse.h>

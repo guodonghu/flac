@@ -1,5 +1,5 @@
 #define FUSE_USE_VERSION 26
-#include "fuse_wrap.hpp"
+#include "fuse_wrapper.hpp"
 #include <fuse.h>
 #include <stdio.h>
 
