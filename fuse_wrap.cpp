@@ -20,6 +20,7 @@
 cJSON* request_json = NULL;
 std::unordered_map<std::string, std::unordered_set<std::string> > genreMap;
 std::unordered_map<std::string, std::unordered_set<std::string> > artistMap;
+std::unordered_set<std::string> musicSet;
 
 void buildMap(std::unordered_map<std::string, std::unordered_set<std::string> > &map, cJSON *music, std::string type) {
   cJSON *title = cJSON_GetObjectItem(music, "title");
@@ -29,13 +30,6 @@ void buildMap(std::unordered_map<std::string, std::unordered_set<std::string> > 
   std::string mp3(title->valuestring);
   mp3 += ".mp3";
   map[category_str].insert(mp3); 
-  
-  if (!map[category_str].empty()) {
-    printf("buildMap!!!!!!!\n");
-    for(auto i : artistMap) {
-      printf("%s\n", i.first.c_str());
-    }
-  }
 }
 
 size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
@@ -92,27 +86,32 @@ MemoryStruct getMetadata(MemoryStruct data) {
   return data;
 }
 
+void updateData(cJSON * musics) {
+  cJSON* title = NULL;
+  int sz = (int)cJSON_GetArraySize(musics);
+  for (int i = 0 ; i < sz; i++) {
+    cJSON * music = cJSON_GetArrayItem(musics, i);
+    title = cJSON_GetObjectItem(music, "title");
+    std::string mp3(title->valuestring);
+    mp3 += ".mp3";
+    musicSet.insert(mp3);
+    buildMap(genreMap, music, "genre");
+    buildMap(artistMap, music, "artist");
+  }
+}
 
 int flacjacket_getattr(const char *path, struct stat *stbuf) {
-  //printf( "[getattr] Called\n" );
-  //printf( "\tAttributes of %s requested\n", path );
 	stbuf->st_uid = getuid(); 
   stbuf->st_gid = getgid();
   stbuf->st_atime = time(NULL);
   stbuf->st_mtime = time(NULL);
   std::string path_str(path);
-  
-  //printf("path is %s !!!!!!!!!!!!!!!!!\n", path);
-  //for (auto i : genreMap) {
-  //  printf("%s\n", i.first.c_str());
-  //}
 
 	if (strcmp(path, "/") == 0) {
 		stbuf->st_mode = S_IFDIR | S_IRWXU;
 		stbuf->st_nlink = 2;
 	} 
   else if (genreMap.find(path_str) != genreMap.end() || artistMap.find(path_str) != artistMap.end()) {
-    //printf("path is : %s\n", path);
     stbuf->st_mode = S_IFDIR | S_IRWXU;
     stbuf->st_nlink = 2;
   }  
@@ -133,36 +132,26 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   std::string path_str(path);
   MemoryStruct json;
   json.memory = (char*)malloc(1);  /* will be grown as needed by the realloc above */ 
-  json.size = 0;    /* no data at this point */ 
+  json.size = 0;                   /* no data at this point */ 
   json = getMetadata(json);
-  /*printf("path is %s !!!!!!!!!!!!!!!!!\n", path);
-  for (auto i : genreMap) {
-    printf("%s\n", i.first.c_str());
-    }*/
-
+  
   if (strcmp(json.memory, "\"not modified\"") != 0) {
     cJSON_Delete(request_json);
     request_json = cJSON_Parse(json.memory);
-    //genreMap.clear();
-    //artistMap.clear();
+    genreMap.clear();
+    artistMap.clear();
+    musicSet.clear();
   } 
   
   cJSON* musics = cJSON_GetObjectItem(request_json, "files");
   
   if (strcmp(path, "/") == 0) {
-    cJSON* title = NULL;
-    int sz = (int)cJSON_GetArraySize(musics);
+    updateData(musics);
     filler(buf, ".", NULL, 0);
     filler(buf, "..", NULL, 0);
-    for (int i = 0 ; i < sz; i++) {
-      cJSON * music = cJSON_GetArrayItem(musics, i);
-      title = cJSON_GetObjectItem(music, "title");
-      std::string mp3(title->valuestring);
-      mp3 += ".mp3";
-      filler(buf, mp3.c_str(), NULL, 0);
-      buildMap(genreMap, music, "genre");
-      buildMap(artistMap, music, "artist");
-    }
+    for (auto i : musicSet) {
+      filler(buf, i.c_str(), NULL, 0);
+    }  
   }
   else if (genreMap.find(path_str) != genreMap.end()) {
     for (auto i : genreMap[path_str]) {
@@ -170,9 +159,7 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     }
   }
   else if (artistMap.find(path_str) != artistMap.end()) {
-    printf("ls artist!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     for (auto i : artistMap[path_str]) {
-      printf("%s\n", i.c_str());
       filler(buf, i.c_str(), NULL, 0);
     }
   }
@@ -186,11 +173,6 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 }
 
 int flacjacket_open(const char *path, struct fuse_file_info *fi) {
-	/*if (strcmp(path, flacjacket_path) == 0)
-		return 0;
-    
-    if (strcmp(path, music_path) == 0)
-  return 0;*/
 	if ((fi->flags & 3) != O_RDONLY) {
 		return -EACCES;
   }
