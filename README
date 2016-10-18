@@ -1,0 +1,11 @@
+1: install libfuse libray:
+sudo apt-get install build-essential fuse libfuse-dev automake libtool git libcurl4-openssl-dev libxml2-dev mime-support
+
+2: build the application by ./build.sh
+
+3: mkdir whatever_name_you_like(e.g. mkdir flacjacket_mnt)
+
+4: issue ./flacjacket dir_name to mount to the directory you make above(e.g. ./flacjacket flacjacket_mnt).
+
+5. use fusermount -u flacjacket_mnt to unmount the file system.
+
