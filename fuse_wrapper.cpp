@@ -15,7 +15,7 @@
 #include <unordered_set>
 #include <vector>
 #include <string>
-
+#include <iostream>
 
 cJSON* request_json = NULL;
 std::unordered_map<std::string, std::unordered_set<std::string> > genreMap;
@@ -106,22 +106,22 @@ int flacjacket_getattr(const char *path, struct stat *stbuf) {
   stbuf->st_atime = time(NULL);
   stbuf->st_mtime = time(NULL);
   std::string path_str(path);
-
-	if (strcmp(path, "/") == 0) {
-		stbuf->st_mode = S_IFDIR | S_IRWXU;
-		stbuf->st_nlink = 2;
-	} 
+  
+  if (strcmp(path, "/") == 0) {
+	  stbuf->st_mode = S_IFDIR | S_IRWXU;
+	  stbuf->st_nlink = 2;
+  } 
   else if (genreMap.find(path_str) != genreMap.end() || artistMap.find(path_str) != artistMap.end()) {
     stbuf->st_mode = S_IFDIR | S_IRWXU;
     stbuf->st_nlink = 2;
   }  
   else {
     stbuf->st_mode = S_IFREG | S_IRWXU;
-		stbuf->st_nlink = 1;
-		stbuf->st_size = 1024;
-	} 
-
-	return 0;
+    stbuf->st_nlink = 1;
+    //stbuf->st_size = 11748343;
+    stbuf->st_size = 4528586;
+  } 
+  return 0;
 }
 
 int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
@@ -173,43 +173,64 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 }
 
 int flacjacket_open(const char *path, struct fuse_file_info *fi) {
-	if ((fi->flags & 3) != O_RDONLY) {
-		return -EACCES;
+  std::string path_str(path);
+  int fd;
+  path_str = path_str.substr(1);
+  std::cout << "in open call" << std::endl;
+  if (musicSet.find(path_str) != musicSet.end()) {
+    std::cout << "in open clause " << std::endl;
+    fd = open("/tmp/test.mp3", fi->flags);
+    std::cout << "fd is: " << fd << std::endl;
+    if (fd < 0) {
+      printf("failed to open file, reason is %s\n", strerror(errno));
+      return -1;
+    }
+    fi->fh = fd;
+    return 0;
   }
-	return 0;
+  return -1;
 }
 
-int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,
-                           struct fuse_file_info *fi) {
-  std::string path_str(path);
-  errno = 0;
-  ssize_t read = 0;
+int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struct fuse_file_info *fi) {
   
-	if(musicSet.find(path_str) != musicSet.end()) {
+  ssize_t read_size = 0;
+  std::cout << "in read call " << std::endl;
+  /*
+  if(musicSet.find(path_str) != musicSet.end()) {
     int fd;
     fd = open("/tmp/test.mp3", O_RDONLY);
     if (fd != -1) {
       read = pread(fd, buf, size, offset);
       size = (size_t)read;
-      close(fd);
+      //close(fd);
       
     } else if (errno != ENOENT) {
-      /* File does exist, but can't be opened. */
+     
       printf("file can't be opened");
     } else {
-      /* File does not exist, and this is fine. */
+     
       printf("file does not exist");
       errno = 0;
     } 
   } 
   else {     
     size = 0;
-  }
-	
-  if (size >= 0) {
-    return (int)size;
-  }
-  else {
-    return -errno;
-  }
+    }*/
+  //int total_size = 99552;
+  //int total_size = 4528586;
+  //while (total_size>0) {
+    read_size += pread(fi->fh, buf, size, offset);
+    //total_size -= size;
+    //}
+  /*if (total_size > 0) {
+    read_size += pread(fi->fh, buf, 4096, offset);
+    }*/
+
+  /*read = pread(fi->fh, buf, size, offset);
+  if (read < 0)
+    fprintf(stderr, "failed to read\n");
+  printf("current offset is: %d\n", (int)offset);
+  printf("number of bytes read is: %d\n", (int)read);
+  */
+  return read_size;
 }
