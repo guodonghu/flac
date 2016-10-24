@@ -195,42 +195,11 @@ int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struc
   
   ssize_t read_size = 0;
   std::cout << "in read call " << std::endl;
-  /*
-  if(musicSet.find(path_str) != musicSet.end()) {
-    int fd;
-    fd = open("/tmp/test.mp3", O_RDONLY);
-    if (fd != -1) {
-      read = pread(fd, buf, size, offset);
-      size = (size_t)read;
-      //close(fd);
-      
-    } else if (errno != ENOENT) {
-     
-      printf("file can't be opened");
-    } else {
-     
-      printf("file does not exist");
-      errno = 0;
-    } 
-  } 
-  else {     
-    size = 0;
-    }*/
-  //int total_size = 99552;
-  //int total_size = 4528586;
-  //while (total_size>0) {
-    read_size += pread(fi->fh, buf, size, offset);
-    //total_size -= size;
-    //}
-  /*if (total_size > 0) {
-    read_size += pread(fi->fh, buf, 4096, offset);
-    }*/
-
-  /*read = pread(fi->fh, buf, size, offset);
-  if (read < 0)
-    fprintf(stderr, "failed to read\n");
-  printf("current offset is: %d\n", (int)offset);
-  printf("number of bytes read is: %d\n", (int)read);
-  */
+  read_size = pread(fi->fh, buf, size, offset);
+  if (read_size == 0) {
+    close(fi->fh);
+  } else if (read_size < 0) {
+    return -errno;
+  }
   return read_size;
 }
