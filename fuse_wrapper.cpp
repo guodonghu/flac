@@ -19,6 +19,8 @@
 #include <iostream>
 #include <fstream>
 #include <sys/wait.h>
+#include <chrono>
+#include <thread>
 using namespace std;
 cJSON* request_json = NULL;
 std::unordered_map<std::string, std::unordered_set<std::string> > genreMap;
@@ -255,13 +257,13 @@ int flacjacket_open(const char *path, struct fuse_file_info *fi) {
     cout << "in open call" << endl;
     std::string path_str(path);
     path_str = path_str.substr(1);
-    FILE* fp;
+    /*FILE* fp;
     string str(4528805, 'x');
     fp = fopen("/tmp/buffer.mp3", "w");
     int tmp = (int)fwrite(str.c_str(), 1, str.size(), fp);
     cout << "open and write a file" << endl;
     cout << "file size is: "  << tmp << endl;
-    fclose(fp);
+    fclose(fp);*/
     if (musicMap.find(path_str) != musicMap.end()) {
         cout << "int open statment"<< endl;
         pid = fork();
@@ -270,16 +272,18 @@ int flacjacket_open(const char *path, struct fuse_file_info *fi) {
             // download tmp file
             cout << "key is: " << musicMap[path_str] << endl;
             getMusicData(musicMap[path_str]);
+            // should die
+            exit(0);
         } else if (pid < 0) { 
             perror("fork failed\n");
         } else {
             cout << "im parent" << endl;
-            int fd = open("/tmp/buffer.mp3", O_RDWR);
+            /*int fd = open("/tmp/buffer.mp3", O_RDWR);
             if (fd < -1){
                 perror("failed to open file\n");
             }
             // if open successfully, close it
-            close(fd);
+            close(fd);*/
             return 0;
         } 
     }
@@ -292,22 +296,18 @@ int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struc
     ssize_t read_size = 0;
     int fd = open("/tmp/buffer.mp3", fi->flags);
     fi->fh = fd;
-    sleep(5);
-    read_size = pread(fi->fh, buf, size, offset);
-    cout << "in parent need size: " << size << endl;
-    cout << "in parent read size: " << read_size << endl;
-    if (read_size < 0) {
-        cout << "read size < 0 " << endl;
-        return -errno;
+    //sleep(0.1);// if no data, conditional sleep
+    while (1) {
+        read_size = pread(fi->fh, buf, size, offset);
+        if (read_size <= 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            read_size = pread(fi->fh, buf, size, offset);
+        } else {
+            break;
+        }
     }
     /*
-    if (read_size < 0) {
-        return -errno;
-    } 
-    */
-    /*
     if (read_size == 0) {
-        
         pid_t w = waitpid(pid, NULL, 0);
         cout << "im parent im collecting child's pid " << w  << endl;
         if (w == -1) {
@@ -317,25 +317,4 @@ int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struc
     */
     close(fi->fh);
     return read_size;
-    /*std::cout << "im parent in read call " << std::endl;
-    //int fd = open("/tmp/buffer.mp3", fi->flags);
-    //fi->fh = fd;
-    ssize_t read_size = 0;
-    sleep(2);
-    read_size = pread(fi->fh, buf, size, offset);
-    if (read_size == 0) {
-        cout << "read size = 0" << endl;
-        close(fi->fh);
-        
-        pid_t w = waitpid(pid, NULL, 0);
-        if (w == -1) {
-            perror("waitpid");
-            }
-    } else if (read_size < 0) {
-        perror("read size < 0");
-        return -errno;
-    } else {
-        cout << "read size > 0" << endl;
-    }
-    return read_size;*/
 }
