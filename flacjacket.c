@@ -10,6 +10,7 @@ struct flacjacket_oper:fuse_operations {
     readdir	= flacjacket_readdir;
     open = flacjacket_open;
     read = flacjacket_read;
+    release = flacjacket_release;
   }
 };
 
