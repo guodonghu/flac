@@ -20,15 +20,13 @@
 #include <fstream>
 #include <sys/wait.h>
 #include <chrono>
-#include <pthread.h>
 #include <thread>
 using namespace std;
 cJSON* request_json = NULL;
 std::unordered_map<std::string, std::unordered_set<std::string> > genreMap;
 std::unordered_map<std::string, std::unordered_set<std::string> > artistMap;
 std::unordered_map<std::string, std::string> musicMap;
-bool isOpened = false;
-char outfilename[100] = "/tmp/buffer.mp3";
+pid_t pid = -1;
 void buildMap(std::unordered_map<std::string, std::unordered_set<std::string> > &map, cJSON *music, std::string type) {
   cJSON *title = cJSON_GetObjectItem(music, "title");
   cJSON *category = cJSON_GetObjectItem(music, type.c_str());
@@ -108,6 +106,7 @@ void  getMusicData(string name) {
     slist1 = NULL;
     slist1 = curl_slist_append(slist1, "api-key: s00per_seekrit");
     curl_global_init(CURL_GLOBAL_ALL);
+    char outfilename[100] = "/tmp/buffer.mp3";
     hnd = curl_easy_init();
     if (hnd) {
         fp = fopen(outfilename, "wb");
@@ -116,6 +115,7 @@ void  getMusicData(string name) {
         }
         curl_easy_setopt(hnd, CURLOPT_URL, "https://www.exoatmospherics.com/transcoder");
         curl_easy_setopt(hnd, CURLOPT_POSTFIELDS, "Four Tet - Randoms - 01 Moma.flac");
+        //curl_easy_setopt(hnd, CURLOPT_POSTFIELDS, "Invalids - Two-hundred-second EP - 05 The Dynamics Are Just Different.flac");
         curl_easy_setopt(hnd, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)33);
         curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.35.0");
         curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, slist1);
@@ -200,7 +200,6 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   
     cJSON* musics = cJSON_GetObjectItem(request_json, "files");
     updateData(musics); // was in "/" clause, which means updates only when "ls" is used, when "ls /genre" before "ls" -> bug
-    // put it here solves this problem
     if (strcmp(path, "/") == 0) {
         filler(buf, ".", NULL, 0);
         filler(buf, "..", NULL, 0);
@@ -228,51 +227,67 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 }
 
 int flacjacket_open(const char *path, struct fuse_file_info *fi) {
+    if (pid != -1) {
+        cout << "already forked" << endl;
+        return 0;
+    }
+    cout << "in open call" << endl;
     std::string path_str(path);
     path_str = path_str.substr(1);
-    if (isOpened) {
-        // this file is already been used
-        cout << "the file is already opened" << endl;
-        return 0;
-    }
+    /*FILE* fp;
+    string str(4528805, 'x');
+    fp = fopen("/tmp/buffer.mp3", "w");
+    int tmp = (int)fwrite(str.c_str(), 1, str.size(), fp);
+    fclose(fp);*/
     if (musicMap.find(path_str) != musicMap.end()) {
-        // thread 1: create buffer file and download
-        cout << "in open call" << endl;
-        isOpened = true;
-        string message1 = musicMap[path_str];
-        thread thread1(getMusicData, message1);
-        thread1.detach();
-        // main thread wait here a bit
-        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-        return 0;
+        cout << "int open statment"<< endl;
+        pid = fork();
+        if (pid == 0) {
+            cout << "im child" << endl; ;
+            // download tmp file
+            cout << "key is: " << musicMap[path_str] << endl;
+            getMusicData(musicMap[path_str]);
+            // should die
+            exit(0);
+        } else if (pid < 0) { 
+            perror("fork failed\n");
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+            return 0;
+        } 
     }
     return -1;
+  
 }
-
 int flacjacket_release(const char *path, struct fuse_file_info *fi) {
-    // actually we dont have to join thread here, cause after detach subthread runs independently from mainthread
-    // and will terminate automatically when assigned function completes
-    isOpened = false;
-    if (isOpened) {
-        cout << "in release, but isOpened is still true" << endl;
-    } else {
-        cout << "in release and isOpened is changed to false" << endl;
+    if (pid != -1) {
+        pid_t w = waitpid(pid, NULL, 0);
+        if (w != -1) {
+            cout << "im parent im collecting child's pid " << w  << endl;
+        } else {
+            cout << "im parent reap failed" << endl;
+            perror("waitpid");
+        }
     }
-    
+    pid = -1;
     return 0;
-
 }
 
 int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struct fuse_file_info *fi) {
     std::cout << "im parent in read call " << std::endl;
     cout << "read offset is: " << offset << endl;
-    // here the range we left for first seek is 5000 bytes from the end
+    
     if (offset > 4528805-5000 && offset < 4528805) {
         cout << "seek for tag, return herer" << endl;
+        /*string fake(size, 'U');
+        memcpy(buf, fake.c_str(), size);
+        return size;*/
         return size;
+        
+        //offset = 0;
     }
     ssize_t read_size = 0;
-    int fd = open(outfilename, fi->flags);
+    int fd = open("/tmp/buffer.mp3", fi->flags);
     fi->fh = fd;
     while (1) {
         read_size = pread(fi->fh, buf, size, offset);
@@ -285,4 +300,10 @@ int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struc
     }
     close(fi->fh);
     return read_size;
+    /*
+      1. if offset near end, return directly, no work
+      2. hard write a file when create, prefill with dummy info
+      3. if offset near end, return dummy data
+      4. if offset near end, force offset to 0 in pread.
+     */
 }
