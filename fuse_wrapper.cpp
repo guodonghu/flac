@@ -20,15 +20,15 @@
 #include <fstream>
 #include <sys/wait.h>
 #include <chrono>
-#include <pthread.h>
 #include <thread>
-using namespace std;
 cJSON* request_json = NULL;
+
 std::unordered_map<std::string, std::unordered_set<std::string> > genreMap;
 std::unordered_map<std::string, std::unordered_set<std::string> > artistMap;
 std::unordered_map<std::string, std::string> musicMap;
-bool isOpened = false;
+
 char outfilename[100] = "/tmp/buffer.mp3";
+
 void buildMap(std::unordered_map<std::string, std::unordered_set<std::string> > &map, cJSON *music, std::string type) {
   cJSON *title = cJSON_GetObjectItem(music, "title");
   cJSON *category = cJSON_GetObjectItem(music, type.c_str());
@@ -56,9 +56,9 @@ size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *user
 
 
 size_t WriteMusicCallback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
-    cout << "im child im downloading music" << endl;
-    size_t written = fwrite(ptr, size, nmemb, stream);
-    return written;
+  std::cout << "im child im downloading music" << std::endl;
+  size_t written = fwrite(ptr, size, nmemb, stream);
+  return written;
 }
 
 MemoryStruct getMetadata(MemoryStruct data) {
@@ -100,44 +100,44 @@ MemoryStruct getMetadata(MemoryStruct data) {
   return data;
 }
 
-void  getMusicData(string name) {
-    CURLcode ret;
-    CURL *hnd;
-    FILE* fp = NULL;
-    struct curl_slist *slist1;
-    slist1 = NULL;
-    slist1 = curl_slist_append(slist1, "api-key: s00per_seekrit");
-    curl_global_init(CURL_GLOBAL_ALL);
-    hnd = curl_easy_init();
-    if (hnd) {
-        fp = fopen(outfilename, "wb");
-        if (fp) {
-            cout << "open file success" << endl;
-        }
-        curl_easy_setopt(hnd, CURLOPT_URL, "https://www.exoatmospherics.com/transcoder");
-        curl_easy_setopt(hnd, CURLOPT_POSTFIELDS, "Four Tet - Randoms - 01 Moma.flac");
-        curl_easy_setopt(hnd, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)33);
-        curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.35.0");
-        curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, slist1);
-        curl_easy_setopt(hnd, CURLOPT_MAXREDIRS, 50L);
-        curl_easy_setopt(hnd, CURLOPT_TCP_KEEPALIVE, 1L);
-        curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, WriteMusicCallback);
-        curl_easy_setopt(hnd, CURLOPT_WRITEDATA, fp);
-        ret = curl_easy_perform(hnd);
-        if (ret != 0) {
-            perror("wrong ret value\n");
-        }
-        /***************clean up********************/
-        curl_easy_cleanup(hnd);
-        hnd = NULL;
-        curl_slist_free_all(slist1);
-        slist1 = NULL;
-        //curl_global_cleanup();
-        /*******************************************/
-        return;
+void  getMusicData(std::string name) {
+  CURLcode ret;
+  CURL *hnd;
+  FILE* fp = NULL;
+  struct curl_slist *slist1;
+  slist1 = NULL;
+  slist1 = curl_slist_append(slist1, "api-key: s00per_seekrit");
+  curl_global_init(CURL_GLOBAL_ALL);
+  hnd = curl_easy_init();
+  if (hnd) {
+    fp = fopen(outfilename, "wb");
+    if (fp) {
+      std::cout << "open file success" << std::endl;
     }
-    perror("curl handler is null\n");
+    curl_easy_setopt(hnd, CURLOPT_URL, "https://www.exoatmospherics.com/transcoder");
+    curl_easy_setopt(hnd, CURLOPT_POSTFIELDS, "Four Tet - Randoms - 01 Moma.flac");
+    curl_easy_setopt(hnd, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)33);
+    curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.35.0");
+    curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, slist1);
+    curl_easy_setopt(hnd, CURLOPT_MAXREDIRS, 50L);
+    curl_easy_setopt(hnd, CURLOPT_TCP_KEEPALIVE, 1L);
+    curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, WriteMusicCallback);
+    curl_easy_setopt(hnd, CURLOPT_WRITEDATA, fp);
+    ret = curl_easy_perform(hnd);
+    if (ret != 0) {
+      perror("wrong ret value\n");
+    }
+    /***************clean up********************/
+    curl_easy_cleanup(hnd);
+    hnd = NULL;
+    curl_slist_free_all(slist1);
+    slist1 = NULL;
+    //curl_global_cleanup();
+    /*******************************************/
     return;
+  }
+  perror("curl handler is null\n");
+  return;
 }
 
 
@@ -159,130 +159,122 @@ void updateData(cJSON * musics) {
 }
 
 int flacjacket_getattr(const char *path, struct stat *stbuf) {
+  int res = 0;
 	stbuf->st_uid = getuid(); 
-    stbuf->st_gid = getgid();
+  stbuf->st_gid = getgid();
   stbuf->st_atime = time(NULL);
   stbuf->st_mtime = time(NULL);
   std::string path_str(path);
-  
+
   if (strcmp(path, "/") == 0) {
 	  stbuf->st_mode = S_IFDIR | S_IRWXU;
 	  stbuf->st_nlink = 2;
-  } else if (genreMap.find(path_str) != genreMap.end() || artistMap.find(path_str) != artistMap.end()) {
+  } 
+  else if (genreMap.find(path_str) != genreMap.end() || artistMap.find(path_str) != artistMap.end()) {
     stbuf->st_mode = S_IFDIR | S_IRWXU;
     stbuf->st_nlink = 2;
-  } else {
+  } 
+  else if (musicMap.find(path_str.substr(1)) != musicMap.end()) {
     stbuf->st_mode = S_IFREG | S_IRWXU;
     stbuf->st_nlink = 1;
     stbuf->st_size = 4528805;
-  } 
-  return 0;
+  }
+  else {
+    res = -ENOENT;
+  }
+  
+  return res;
 }
 
 int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t offset, struct fuse_file_info *fi) {
-    (void) offset;
-    (void) fi;
+                       off_t offset, struct fuse_file_info *fi) {
+  (void) offset;
+  (void) fi;
     
-    std::string path_str(path);
-    MemoryStruct json;
-    json.memory = (char*)malloc(1);  /* will be grown as needed by the realloc above */ 
-    json.size = 0;                   /* no data at this point */ 
-    json = getMetadata(json);
+  std::string path_str(path);
+  MemoryStruct json;
+  json.memory = (char*)malloc(1);  /* will be grown as needed by the realloc above */ 
+  json.size = 0;                   /* no data at this point */ 
+  json = getMetadata(json);
     
-    if (strcmp(json.memory, "\"not modified\"") != 0) {
-        cJSON_Delete(request_json);
-        request_json = cJSON_Parse(json.memory);
-        genreMap.clear();
-        artistMap.clear();
-        musicMap.clear();
-    } 
+  if (strcmp(json.memory, "\"not modified\"") != 0) {
+    cJSON_Delete(request_json);
+    request_json = cJSON_Parse(json.memory);
+    genreMap.clear();
+    artistMap.clear();
+    musicMap.clear();
+  } 
   
-    cJSON* musics = cJSON_GetObjectItem(request_json, "files");
-    updateData(musics); // was in "/" clause, which means updates only when "ls" is used, when "ls /genre" before "ls" -> bug
-    // put it here solves this problem
-    if (strcmp(path, "/") == 0) {
-        filler(buf, ".", NULL, 0);
-        filler(buf, "..", NULL, 0);
-        for (auto i : musicMap) {
-            filler(buf, i.first.c_str(), NULL, 0);
-        }  
+  cJSON* musics = cJSON_GetObjectItem(request_json, "files");
+  updateData(musics); // was in "/" clause, which means updates only when "ls" is used, when "ls /genre" before "ls" -> bug
+  // put it here solves this problem
+  if (strcmp(path, "/") == 0) {
+    filler(buf, ".", NULL, 0);
+    filler(buf, "..", NULL, 0);
+    for (auto i : musicMap) {
+      filler(buf, i.first.c_str(), NULL, 0);
+    }  
+  }
+  else if (genreMap.find(path_str) != genreMap.end()) {
+    for (auto i : genreMap[path_str]) {
+      filler(buf, i.c_str(), NULL, 0);
     }
-    else if (genreMap.find(path_str) != genreMap.end()) {
-        for (auto i : genreMap[path_str]) {
-            filler(buf, i.c_str(), NULL, 0);
-        }
+  }
+  else if (artistMap.find(path_str) != artistMap.end()) {
+    for (auto i : artistMap[path_str]) {
+      filler(buf, i.c_str(), NULL, 0);
     }
-    else if (artistMap.find(path_str) != artistMap.end()) {
-        for (auto i : artistMap[path_str]) {
-            filler(buf, i.c_str(), NULL, 0);
-        }
-    }
-    else {
-        return -ENOENT;
-    }
+  }
+  else {
+    return -ENOENT;
+  }
   
-    //clean up
-    free(json.memory);
-    return 0;
+  //clean up
+  free(json.memory);
+  return 0;
 }
 
 int flacjacket_open(const char *path, struct fuse_file_info *fi) {
-    std::string path_str(path);
-    path_str = path_str.substr(1);
-    if (isOpened) {
-        // this file is already been used
-        cout << "the file is already opened" << endl;
-        return 0;
-    }
-    if (musicMap.find(path_str) != musicMap.end()) {
-        // thread 1: create buffer file and download
-        cout << "in open call" << endl;
-        isOpened = true;
-        string message1 = musicMap[path_str];
-        thread thread1(getMusicData, message1);
-        thread1.detach();
-        // main thread wait here a bit
-        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-        return 0;
-    }
-    return -1;
+  std::string path_str(path);
+  path_str = path_str.substr(1);
+  
+  if (musicMap.find(path_str) != musicMap.end()) {
+    // thread 1: create buffer file and download
+    std::cout << "in open call" << std::endl;
+    std::string message1 = musicMap[path_str];
+    std::thread thread1(getMusicData, message1);
+    thread1.detach();
+    // main thread wait here a bit
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    return 0;
+  }
+  return -1;
 }
 
 int flacjacket_release(const char *path, struct fuse_file_info *fi) {
-    // actually we dont have to join thread here, cause after detach subthread runs independently from mainthread
-    // and will terminate automatically when assigned function completes
-    isOpened = false;
-    if (isOpened) {
-        cout << "in release, but isOpened is still true" << endl;
-    } else {
-        cout << "in release and isOpened is changed to false" << endl;
-    }
-    
-    return 0;
-
+  return 0;
 }
 
 int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struct fuse_file_info *fi) {
-    std::cout << "im parent in read call " << std::endl;
-    cout << "read offset is: " << offset << endl;
-    // here the range we left for first seek is 5000 bytes from the end
-    if (offset > 4528805-5000 && offset < 4528805) {
-        cout << "seek for tag, return herer" << endl;
-        return size;
+  std::cout << "im parent in read call " << std::endl;
+  std::cout << "read offset is: " << offset << std::endl;
+  // here the range we left for first seek is 5000 bytes from the end
+  if (offset > 4528805-5000 && offset < 4528805) {
+    std::cout << "seek for tag, return herer" << std::endl;
+    return size;
+  }
+  ssize_t read_size = 0;
+  int fd = open(outfilename, fi->flags);
+  fi->fh = fd;
+  while (1) {
+    read_size = pread(fi->fh, buf, size, offset);
+    if (read_size <= 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      read_size = pread(fi->fh, buf, size, offset);
+    } else {
+      break;
     }
-    ssize_t read_size = 0;
-    int fd = open(outfilename, fi->flags);
-    fi->fh = fd;
-    while (1) {
-        read_size = pread(fi->fh, buf, size, offset);
-        if (read_size <= 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            read_size = pread(fi->fh, buf, size, offset);
-        } else {
-            break;
-        }
-    }
-    close(fi->fh);
-    return read_size;
+  }
+  close(fi->fh);
+  return read_size;
 }
