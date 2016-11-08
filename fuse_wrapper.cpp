@@ -269,12 +269,13 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 int flacjacket_open(const char *path, struct fuse_file_info *fi) {
   std::string path_str(path);
-  path_str = path_str.substr(1);
+  std::size_t lastSlash = path_str.find_last_of("/");
+  std::string file = path_str.substr(lastSlash + 1);
   
-  if (musicMap.find(path_str) != musicMap.end()) {
+  if (musicMap.find(file) != musicMap.end()) {
     // thread 1: create buffer file and download
     std::cout << "in open call" << std::endl;
-    std::string message1 = musicMap[path_str];
+    std::string message1 = musicMap[file];
     std::thread thread1(getMusicData, message1);
     thread1.detach();
     // main thread wait here a bit
