@@ -180,17 +180,21 @@ int flacjacket_getattr(const char *path, struct stat *stbuf) {
   stbuf->st_atime = time(NULL);
   stbuf->st_mtime = time(NULL);
   std::string path_str(path);
+  std::size_t lastSlash = path_str.find_last_of("/");
+  std::string file = path_str.substr(lastSlash + 1);
+
 
   if (strcmp(path, "/") == 0 || strcmp(path, "/genre") == 0 
       || strcmp(path, "/artist") == 0 || strcmp(path, "/musicCollection") == 0) {
 	  stbuf->st_mode = S_IFDIR | S_IRWXU;
 	  stbuf->st_nlink = 2;
   }
-  else if (genreMap.find(path_str.substr(strlen("/genre/"))) != genreMap.end() || artistMap.find(path_str.substr(strlen("/artist/"))) != artistMap.end()) {
+  else if ((path_str.find("/genre/") != std::string::npos && genreMap.find(path_str.substr(strlen("/genre/"))) != genreMap.end())
+           || (path_str.find("/artist/") != std::string::npos && artistMap.find(path_str.substr(strlen("/artist/"))) != artistMap.end())) {
     stbuf->st_mode = S_IFDIR | S_IRWXU;
     stbuf->st_nlink = 2;
   }
-  else if (musicMap.find(path_str.substr(strlen("/musicCollection/"))) != musicMap.end()) {
+  else if (musicMap.find(file) != musicMap.end()) {
     stbuf->st_mode = S_IFREG | S_IRWXU;
     stbuf->st_nlink = 1;
     stbuf->st_size = 4528805;
@@ -228,13 +232,32 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   }
   else if (strcmp(path, "/genre") == 0) {
     for (auto i : genreMap) {
-      std::cout << i.first << std::endl;
       filler(buf, i.first.c_str(), NULL, 0);
+    }
+  }
+  else if (path_str.find("/genre/") != std::string::npos) {
+    std::string file = path_str.substr(strlen("/genre/"));
+    std::size_t pos = file.find_first_of("/");
+    std::string genre = file.substr(0, pos);
+    if (genreMap.find(genre) != genreMap.end()) {
+      for (std::string i : genreMap[genre]) {
+        filler(buf, i.c_str(), NULL, 0);
+      }
     }
   }
   else if (strcmp(path, "/artist") == 0) {
     for (auto i : artistMap) {
       filler(buf, i.first.c_str(), NULL, 0);
+    }
+  }
+  else if (path_str.find("/artist/") != std::string::npos) {
+    std::string file = path_str.substr(strlen("/artist/"));
+    std::size_t pos = file.find_first_of("/");
+    std::string artist = file.substr(0, pos);
+    if (artistMap.find(artist) != artistMap.end()) {
+      for (std::string i : artistMap[artist]) {
+        filler(buf, i.c_str(), NULL, 0);
+      }
     }
   }
   else {
