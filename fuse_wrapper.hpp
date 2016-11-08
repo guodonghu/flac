@@ -15,10 +15,6 @@ struct _MemoryStruct {
 
 typedef struct _MemoryStruct MemoryStruct;
 
-size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp);
-
-MemoryStruct getMetadata(MemoryStruct data);
-
 int flacjacket_getattr(const char *path, struct stat *stbuf);
 
 int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi);

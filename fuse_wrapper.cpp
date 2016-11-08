@@ -33,13 +33,12 @@ void buildMap(std::unordered_map<std::string, std::unordered_set<std::string> > 
   cJSON *title = cJSON_GetObjectItem(music, "title");
   cJSON *category = cJSON_GetObjectItem(music, type.c_str());
   std::string category_str(category->valuestring);
-  category_str = "/" + category_str;
   std::string mp3(title->valuestring);
   mp3 += ".mp3";
   map[category_str].insert(mp3); 
 }
 
-size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+size_t WriteMetadataCallback(void *contents, size_t size, size_t nmemb, void *userp) {
   size_t realsize = size * nmemb;
   MemoryStruct *mem = (MemoryStruct *)userp;
   mem->memory = (char *)realloc(mem->memory, mem->size + realsize + 1);
@@ -61,7 +60,28 @@ size_t WriteMusicCallback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
   return written;
 }
 
-MemoryStruct getMetadata(MemoryStruct data) {
+void updateData(cJSON * musics) {
+  cJSON* title = NULL;
+  cJSON* key = NULL;
+  int sz = (int)cJSON_GetArraySize(musics);
+  for (int i = 0 ; i < sz; i++) {
+    cJSON * music = cJSON_GetArrayItem(musics, i);
+    title = cJSON_GetObjectItem(music, "title");
+    key = cJSON_GetObjectItem(music, "key");
+    std::string mp3(title->valuestring);
+    std::string keystr(key->valuestring);
+    mp3 += ".mp3";
+    musicMap[mp3] = keystr;
+    buildMap(genreMap, music, "genre");
+    buildMap(artistMap, music, "artist");
+  }
+}
+
+void getMetadata() {
+  MemoryStruct data;
+  data.memory = (char*)malloc(1);  /* will be grown as needed by the realloc above */ 
+  data.size = 0;                   /* no data at this point */ 
+  
   CURLcode ret;
   CURL *hnd;
   struct curl_slist *slist1;
@@ -84,7 +104,7 @@ MemoryStruct getMetadata(MemoryStruct data) {
   curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, slist1);
   curl_easy_setopt(hnd, CURLOPT_MAXREDIRS, 50L);
   curl_easy_setopt(hnd, CURLOPT_TCP_KEEPALIVE, 1L);
-  curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+  curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, WriteMetadataCallback);
   curl_easy_setopt(hnd, CURLOPT_WRITEDATA,(void*)&data);
   ret = curl_easy_perform(hnd);
   curl_easy_cleanup(hnd);
@@ -97,7 +117,20 @@ MemoryStruct getMetadata(MemoryStruct data) {
   curl_slist_free_all(slist1);
   slist1 = NULL;
   curl_global_cleanup();
-  return data;
+
+  if (strcmp(data.memory, "\"not modified\"") != 0) {
+    cJSON_Delete(request_json);
+    request_json = cJSON_Parse(data.memory);
+    genreMap.clear();
+    artistMap.clear();
+    musicMap.clear();
+  } 
+  cJSON* musics = cJSON_GetObjectItem(request_json, "files");
+  updateData(musics); // was in "/" clause, which means updates only when "ls" is used, when "ls /genre" before "ls" -> bug
+  // put it here solves this problem
+  //clean up
+  free(data.memory);
+  return;
 }
 
 void  getMusicData(std::string name) {
@@ -140,24 +173,6 @@ void  getMusicData(std::string name) {
   return;
 }
 
-
-void updateData(cJSON * musics) {
-  cJSON* title = NULL;
-  cJSON* key = NULL;
-  int sz = (int)cJSON_GetArraySize(musics);
-  for (int i = 0 ; i < sz; i++) {
-    cJSON * music = cJSON_GetArrayItem(musics, i);
-    title = cJSON_GetObjectItem(music, "title");
-    key = cJSON_GetObjectItem(music, "key");
-    std::string mp3(title->valuestring);
-    std::string keystr(key->valuestring);
-    mp3 += ".mp3";
-    musicMap[mp3] = keystr;
-    buildMap(genreMap, music, "genre");
-    buildMap(artistMap, music, "artist");
-  }
-}
-
 int flacjacket_getattr(const char *path, struct stat *stbuf) {
   int res = 0;
 	stbuf->st_uid = getuid(); 
@@ -166,15 +181,16 @@ int flacjacket_getattr(const char *path, struct stat *stbuf) {
   stbuf->st_mtime = time(NULL);
   std::string path_str(path);
 
-  if (strcmp(path, "/") == 0) {
+  if (strcmp(path, "/") == 0 || strcmp(path, "/genre") == 0 
+      || strcmp(path, "/artist") == 0 || strcmp(path, "/musicCollection") == 0) {
 	  stbuf->st_mode = S_IFDIR | S_IRWXU;
 	  stbuf->st_nlink = 2;
-  } 
-  else if (genreMap.find(path_str) != genreMap.end() || artistMap.find(path_str) != artistMap.end()) {
+  }
+  else if (genreMap.find(path_str.substr(strlen("/genre/"))) != genreMap.end() || artistMap.find(path_str.substr(strlen("/artist/"))) != artistMap.end()) {
     stbuf->st_mode = S_IFDIR | S_IRWXU;
     stbuf->st_nlink = 2;
-  } 
-  else if (musicMap.find(path_str.substr(1)) != musicMap.end()) {
+  }
+  else if (musicMap.find(path_str.substr(strlen("/musicCollection/"))) != musicMap.end()) {
     stbuf->st_mode = S_IFREG | S_IRWXU;
     stbuf->st_nlink = 1;
     stbuf->st_size = 4528805;
@@ -190,47 +206,41 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                        off_t offset, struct fuse_file_info *fi) {
   (void) offset;
   (void) fi;
-    
+ 
   std::string path_str(path);
-  MemoryStruct json;
-  json.memory = (char*)malloc(1);  /* will be grown as needed by the realloc above */ 
-  json.size = 0;                   /* no data at this point */ 
-  json = getMetadata(json);
-    
-  if (strcmp(json.memory, "\"not modified\"") != 0) {
-    cJSON_Delete(request_json);
-    request_json = cJSON_Parse(json.memory);
-    genreMap.clear();
-    artistMap.clear();
-    musicMap.clear();
-  } 
-  
-  cJSON* musics = cJSON_GetObjectItem(request_json, "files");
-  updateData(musics); // was in "/" clause, which means updates only when "ls" is used, when "ls /genre" before "ls" -> bug
-  // put it here solves this problem
+  std::thread (getMetadata).detach();
+  //try with GUI, could live witout this
+  if (musicMap.empty()) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000)); 
+  }
+
   if (strcmp(path, "/") == 0) {
     filler(buf, ".", NULL, 0);
     filler(buf, "..", NULL, 0);
+    filler(buf, "musicCollection", NULL, 0);
+    filler(buf, "genre", NULL, 0);
+    filler(buf, "artist", NULL, 0);
+  }
+  else if (strcmp(path, "/musicCollection") == 0) {
     for (auto i : musicMap) {
       filler(buf, i.first.c_str(), NULL, 0);
     }  
   }
-  else if (genreMap.find(path_str) != genreMap.end()) {
-    for (auto i : genreMap[path_str]) {
-      filler(buf, i.c_str(), NULL, 0);
+  else if (strcmp(path, "/genre") == 0) {
+    for (auto i : genreMap) {
+      std::cout << i.first << std::endl;
+      filler(buf, i.first.c_str(), NULL, 0);
     }
   }
-  else if (artistMap.find(path_str) != artistMap.end()) {
-    for (auto i : artistMap[path_str]) {
-      filler(buf, i.c_str(), NULL, 0);
+  else if (strcmp(path, "/artist") == 0) {
+    for (auto i : artistMap) {
+      filler(buf, i.first.c_str(), NULL, 0);
     }
   }
   else {
     return -ENOENT;
   }
   
-  //clean up
-  free(json.memory);
   return 0;
 }
 
