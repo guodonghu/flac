@@ -67,7 +67,7 @@ void updateData(cJSON * musics) {
     cJSON *title = cJSON_GetObjectItem(music, "title");
     cJSON *key = cJSON_GetObjectItem(music, "key");
     cJSON *duration = cJSON_GetObjectItem(music, "duration");
-    int fileSize = 16000 * duration->valuedouble + 800;
+    int fileSize = 16000 * duration->valuedouble + 1000;
     std::string mp3(title->valuestring);
     std::string keystr(key->valuestring);
     mp3 += ".mp3";
@@ -297,7 +297,7 @@ int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struc
   std::size_t lastSlash = path_str.find_last_of("/");
   std::string file = path_str.substr(lastSlash + 1);
   // here the range we left for first seek is 5000 bytes from the end
-  if (offset > musicSize[file] - 2000 && offset < musicSize[file]) {
+  if (offset > musicSize[file] - 3000 && offset < musicSize[file]) {
     std::cout << "seek for tag, return herer" << std::endl;
     return size;
   }
