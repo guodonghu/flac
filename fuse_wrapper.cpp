@@ -21,13 +21,13 @@
 #include <sys/wait.h>
 #include <chrono>
 #include <thread>
-cJSON* request_json = NULL;
 
+cJSON* request_json = NULL;
 std::unordered_map<std::string, std::unordered_set<std::string> > genreMap;
 std::unordered_map<std::string, std::unordered_set<std::string> > artistMap;
 std::unordered_map<std::string, std::string> musicMap;
-
-char outfilename[100] = "/tmp/buffer.mp3";
+std::unordered_map<std::string, int> musicSize;
+const char outfilename[100] = "/tmp/buffer.mp3";
 
 void buildMap(std::unordered_map<std::string, std::unordered_set<std::string> > &map, cJSON *music, std::string type) {
   cJSON *title = cJSON_GetObjectItem(music, "title");
@@ -61,17 +61,18 @@ size_t WriteMusicCallback(void *ptr, size_t size, size_t nmemb, FILE *stream) {
 }
 
 void updateData(cJSON * musics) {
-  cJSON* title = NULL;
-  cJSON* key = NULL;
   int sz = (int)cJSON_GetArraySize(musics);
   for (int i = 0 ; i < sz; i++) {
-    cJSON * music = cJSON_GetArrayItem(musics, i);
-    title = cJSON_GetObjectItem(music, "title");
-    key = cJSON_GetObjectItem(music, "key");
+    cJSON *music = cJSON_GetArrayItem(musics, i);
+    cJSON *title = cJSON_GetObjectItem(music, "title");
+    cJSON *key = cJSON_GetObjectItem(music, "key");
+    cJSON *duration = cJSON_GetObjectItem(music, "duration");
+    int fileSize = 16000 * duration->valuedouble + 800;
     std::string mp3(title->valuestring);
     std::string keystr(key->valuestring);
     mp3 += ".mp3";
     musicMap[mp3] = keystr;
+    musicSize[mp3] = fileSize;
     buildMap(genreMap, music, "genre");
     buildMap(artistMap, music, "artist");
   }
@@ -133,7 +134,7 @@ void getMetadata() {
   return;
 }
 
-void  getMusicData(std::string name) {
+void  getMusicData(std::string key) {
   CURLcode ret;
   CURL *hnd;
   FILE* fp = NULL;
@@ -148,7 +149,7 @@ void  getMusicData(std::string name) {
       std::cout << "open file success" << std::endl;
     }
     curl_easy_setopt(hnd, CURLOPT_URL, "https://www.exoatmospherics.com/transcoder");
-    curl_easy_setopt(hnd, CURLOPT_POSTFIELDS, "Four Tet - Randoms - 01 Moma.flac");
+    curl_easy_setopt(hnd, CURLOPT_POSTFIELDS, key.c_str());
     curl_easy_setopt(hnd, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)33);
     curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.35.0");
     curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, slist1);
@@ -197,7 +198,7 @@ int flacjacket_getattr(const char *path, struct stat *stbuf) {
   else if (musicMap.find(file) != musicMap.end()) {
     stbuf->st_mode = S_IFREG | S_IRWXU;
     stbuf->st_nlink = 1;
-    stbuf->st_size = 4528805;
+    stbuf->st_size = musicSize[file];
   }
   else {
     res = -ENOENT;
@@ -292,8 +293,11 @@ int flacjacket_release(const char *path, struct fuse_file_info *fi) {
 int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struct fuse_file_info *fi) {
   std::cout << "im parent in read call " << std::endl;
   std::cout << "read offset is: " << offset << std::endl;
+  std::string path_str(path);
+  std::size_t lastSlash = path_str.find_last_of("/");
+  std::string file = path_str.substr(lastSlash + 1);
   // here the range we left for first seek is 5000 bytes from the end
-  if (offset > 4528805-5000 && offset < 4528805) {
+  if (offset > musicSize[file] - 2000 && offset < musicSize[file]) {
     std::cout << "seek for tag, return herer" << std::endl;
     return size;
   }
