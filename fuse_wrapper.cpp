@@ -22,6 +22,7 @@
 #include <chrono>
 #include <thread>
 
+bool isOpened = false;
 cJSON* request_json = NULL;
 std::unordered_map<std::string, std::unordered_set<std::string> > genreMap;
 std::unordered_map<std::string, std::unordered_set<std::string> > artistMap;
@@ -135,6 +136,7 @@ void getMetadata() {
 }
 
 void  getMusicData(std::string key) {
+  std::cout << "getMusic data:" << key << std::endl; 
   CURLcode ret;
   CURL *hnd;
   FILE* fp = NULL;
@@ -150,7 +152,7 @@ void  getMusicData(std::string key) {
     }
     curl_easy_setopt(hnd, CURLOPT_URL, "https://www.exoatmospherics.com/transcoder");
     curl_easy_setopt(hnd, CURLOPT_POSTFIELDS, key.c_str());
-    curl_easy_setopt(hnd, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)33);
+    curl_easy_setopt(hnd, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)key.size());
     curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.35.0");
     curl_easy_setopt(hnd, CURLOPT_HTTPHEADER, slist1);
     curl_easy_setopt(hnd, CURLOPT_MAXREDIRS, 50L);
@@ -168,6 +170,7 @@ void  getMusicData(std::string key) {
     slist1 = NULL;
     //curl_global_cleanup();
     /*******************************************/
+    fclose(fp);
     return;
   }
   perror("curl handler is null\n");
@@ -272,10 +275,13 @@ int flacjacket_open(const char *path, struct fuse_file_info *fi) {
   std::string path_str(path);
   std::size_t lastSlash = path_str.find_last_of("/");
   std::string file = path_str.substr(lastSlash + 1);
-  
+  if (isOpened) {
+    return 0;
+  }
   if (musicMap.find(file) != musicMap.end()) {
     // thread 1: create buffer file and download
     std::cout << "in open call" << std::endl;
+    isOpened = true;
     std::string message1 = musicMap[file];
     std::thread thread1(getMusicData, message1);
     thread1.detach();
@@ -287,6 +293,7 @@ int flacjacket_open(const char *path, struct fuse_file_info *fi) {
 }
 
 int flacjacket_release(const char *path, struct fuse_file_info *fi) {
+  isOpened = false;
   return 0;
 }
 
@@ -297,7 +304,7 @@ int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struc
   std::size_t lastSlash = path_str.find_last_of("/");
   std::string file = path_str.substr(lastSlash + 1);
   // here the range we left for first seek is 5000 bytes from the end
-  if (offset > musicSize[file] - 3000 && offset < musicSize[file]) {
+  if (offset > musicSize[file] - 5000 && offset < musicSize[file]) {
     std::cout << "seek for tag, return herer" << std::endl;
     return size;
   }
@@ -305,10 +312,12 @@ int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struc
   int fd = open(outfilename, fi->flags);
   fi->fh = fd;
   while (1) {
+    std::cout << "enter read while loop" << std::endl; 
     read_size = pread(fi->fh, buf, size, offset);
     if (read_size <= 0) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      read_size = pread(fi->fh, buf, size, offset);
+      //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      //read_size = pread(fi->fh, buf, size, offset);
+      return read_size;
     } else {
       break;
     }
