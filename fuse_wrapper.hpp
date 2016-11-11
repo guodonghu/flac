@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include "cJSON.h"
 
+extern char* bitRate;
 extern cJSON* request_json;
 
 struct _MemoryStruct {

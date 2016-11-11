@@ -22,6 +22,7 @@
 #include <chrono>
 #include <thread>
 
+extern char* bitRate;
 bool isOpened = false;
 cJSON* request_json = NULL;
 std::unordered_map<std::string, std::unordered_set<std::string> > genreMap;
@@ -68,7 +69,13 @@ void updateData(cJSON * musics) {
     cJSON *title = cJSON_GetObjectItem(music, "title");
     cJSON *key = cJSON_GetObjectItem(music, "key");
     cJSON *duration = cJSON_GetObjectItem(music, "duration");
-    int fileSize = 16000 * duration->valuedouble + 1000;
+    int fileSize;
+    if (bitRate == NULL) {
+      fileSize = 16000 * duration->valuedouble + 1000;
+    }
+    else {
+      fileSize = (atof(bitRate) / 8) * 1000 * duration->valuedouble + 1000;
+    }
     std::string mp3(title->valuestring);
     std::string keystr(key->valuestring);
     mp3 += ".mp3";
@@ -150,7 +157,15 @@ void  getMusicData(std::string key) {
     if (fp) {
       std::cout << "open file success" << std::endl;
     }
-    curl_easy_setopt(hnd, CURLOPT_URL, "https://www.exoatmospherics.com/transcoder");
+    if (bitRate == NULL) {
+      curl_easy_setopt(hnd, CURLOPT_URL, "https://www.exoatmospherics.com/transcoder");
+    }
+    else {
+      std::string url = "https://www.exoatmospherics.com/transcoder";
+      url += "?quality=";
+      url += bitRate;
+      curl_easy_setopt(hnd, CURLOPT_URL, url.c_str());
+    }
     curl_easy_setopt(hnd, CURLOPT_POSTFIELDS, key.c_str());
     curl_easy_setopt(hnd, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)key.size());
     curl_easy_setopt(hnd, CURLOPT_USERAGENT, "curl/7.35.0");
