@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include "cJSON.h"
 
+extern char* bitRate;
 extern cJSON* request_json;
 
 struct _MemoryStruct {
@@ -15,10 +16,6 @@ struct _MemoryStruct {
 
 typedef struct _MemoryStruct MemoryStruct;
 
-size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp);
-
-MemoryStruct getMetadata(MemoryStruct data);
-
 int flacjacket_getattr(const char *path, struct stat *stbuf);
 
 int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi);
@@ -26,6 +23,6 @@ int flacjacket_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_
 int flacjacket_open(const char *path, struct fuse_file_info *fi);
 
 int flacjacket_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
-
+int flacjacket_release(const char *path, struct fuse_file_info *fi);
 
 #endif 
