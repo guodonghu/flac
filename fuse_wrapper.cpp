@@ -326,17 +326,13 @@ int flacjacket_read(const char *path, char *buf, size_t size, off_t offset,struc
   ssize_t read_size = 0;
   int fd = open(outfilename, fi->flags);
   fi->fh = fd;
-  while (1) {
-    std::cout << "enter read while loop" << std::endl; 
+  
+  std::cout << "enter read while loop" << std::endl; 
+  read_size = pread(fi->fh, buf, size, offset);
+  while (read_size <= 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
     read_size = pread(fi->fh, buf, size, offset);
-    if (read_size <= 0) {
-      //std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      //read_size = pread(fi->fh, buf, size, offset);
-      return read_size;
-    } else {
-      break;
-    }
-  }
+  } 
   close(fi->fh);
   return read_size;
 }
