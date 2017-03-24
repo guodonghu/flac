@@ -1,3 +1,7 @@
+                              Flacjacket: A Cloud-based MP3 Filesystem
+Flacjacket is a FUSE (Filesystem in Userspace) MP3 filesystem which transcodes FLAC to MP3 on demand.
+
+Instrcution:
 1: install libfuse libray:
 sudo apt-get install build-essential fuse libfuse-dev automake libtool git libcurl4-openssl-dev libxml2-dev mime-support
 
